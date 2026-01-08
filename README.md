@@ -50,8 +50,8 @@
 ## ⚡️ Quick Start
 
 ```bash
-git clone https://github.com/travisvn/chatterbox-tts-api
-cd chatterbox-tts-api
+git clone https://github.com/illiastra/chatterbox-tts-api-orin-nano-super
+cd chatterbox-tts-api-orin-nano-super
 uv sync
 uv run main.py
 ```
