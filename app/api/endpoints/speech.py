@@ -22,7 +22,7 @@ from app.core import (
     split_text_into_chunks, concatenate_audio_chunks, add_route_aliases,
     TTSStatus, start_tts_request, update_tts_status, get_voice_library
 )
-from app.core.tts_model import get_model, is_multilingual
+from app.core.tts_model import get_model, is_multilingual, is_fp16
 from app.core.text_processing import split_text_for_streaming, get_streaming_settings
 
 # Create router with aliasing support
@@ -238,8 +238,8 @@ async def generate_speech_internal(
             
             print(f"Generating audio for chunk {i+1}/{len(chunks)}: '{chunk[:50]}{'...' if len(chunk) > 50 else ''}'")
             
-            # Use torch.no_grad() to prevent gradient accumulation
-            with torch.no_grad():
+            # Use torch.inference_mode() for better performance
+            with torch.inference_mode():
                 # Run TTS generation in executor to avoid blocking
                 # Prepare generation kwargs
                 generate_kwargs = {
@@ -249,16 +249,40 @@ async def generate_speech_internal(
                     "cfg_weight": cfg_weight,
                     "temperature": temperature
                 }
-                
+
                 # Add language_id for multilingual models
                 if is_multilingual():
                     generate_kwargs["language_id"] = language_id
-                
-                audio_tensor = await loop.run_in_executor(
-                    None,
-                    lambda: model.generate(**generate_kwargs)
-                )
-                
+
+                # Run inference with autocast for FP16 mode
+                # Also set default device to CUDA for tensor creation during generation
+                def run_generate():
+                    # Ensure new tensors are created on CUDA by default
+                    original_device = None
+                    try:
+                        if torch.cuda.is_available():
+                            original_device = torch.get_default_device() if hasattr(torch, 'get_default_device') else None
+                            if hasattr(torch, 'set_default_device'):
+                                torch.set_default_device('cuda')
+                    except:
+                        pass
+
+                    try:
+                        if is_fp16():
+                            with torch.autocast(device_type='cuda', dtype=torch.float16):
+                                return model.generate(**generate_kwargs)
+                        else:
+                            return model.generate(**generate_kwargs)
+                    finally:
+                        # Restore original device if we changed it
+                        if original_device is not None and hasattr(torch, 'set_default_device'):
+                            try:
+                                torch.set_default_device(original_device)
+                            except:
+                                pass
+
+                audio_tensor = await loop.run_in_executor(None, run_generate)
+
                 # Ensure tensor is on the correct device and detached
                 if hasattr(audio_tensor, 'detach'):
                     audio_tensor = audio_tensor.detach()
@@ -276,7 +300,7 @@ async def generate_speech_internal(
         if len(audio_chunks) > 1:
             update_tts_status(request_id, TTSStatus.CONCATENATING, "Concatenating audio chunks")
             print("Concatenating audio chunks...")
-            with torch.no_grad():
+            with torch.inference_mode():
                 final_audio = concatenate_audio_chunks(audio_chunks, model.sr)
         else:
             final_audio = audio_chunks[0]
@@ -330,9 +354,13 @@ async def generate_speech_internal(
             # Clear the list
             audio_chunks.clear()
             
-            # Periodic memory cleanup
-            if REQUEST_COUNTER % Config.MEMORY_CLEANUP_INTERVAL == 0:
+            # Memory cleanup - aggressive in low memory mode, periodic otherwise
+            if Config.LOW_MEMORY_MODE or REQUEST_COUNTER % Config.MEMORY_CLEANUP_INTERVAL == 0:
                 cleanup_memory()
+                # Extra aggressive cleanup for Jetson
+                if Config.LOW_MEMORY_MODE and torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                    torch.cuda.synchronize()
             
             # Log memory usage after processing
             if Config.ENABLE_MEMORY_MONITORING:
@@ -481,21 +509,29 @@ async def generate_speech_streaming(
             
             print(f"Streaming audio for chunk {i+1}/{len(chunks)}: '{chunk[:50]}{'...' if len(chunk) > 50 else ''}'")
             
-            # Use torch.no_grad() to prevent gradient accumulation
-            with torch.no_grad():
-                # Run TTS generation in executor to avoid blocking
-                audio_tensor = await loop.run_in_executor(
-                    None,
-                    lambda: model.generate(
-                        text=chunk,
-                        audio_prompt_path=voice_sample_path,
-                        exaggeration=exaggeration,
-                        cfg_weight=cfg_weight,
-                        temperature=temperature,
-                        **({'language_id': language_id} if is_multilingual() else {})
-                    )
-                )
-                
+            # Use torch.inference_mode() for better performance
+            with torch.inference_mode():
+                # Prepare generation kwargs
+                generate_kwargs = {
+                    "text": chunk,
+                    "audio_prompt_path": voice_sample_path,
+                    "exaggeration": exaggeration,
+                    "cfg_weight": cfg_weight,
+                    "temperature": temperature
+                }
+                if is_multilingual():
+                    generate_kwargs["language_id"] = language_id
+
+                # Run inference with autocast for FP16 mode
+                def run_generate():
+                    if is_fp16():
+                        with torch.autocast(device_type='cuda', dtype=torch.float16):
+                            return model.generate(**generate_kwargs)
+                    else:
+                        return model.generate(**generate_kwargs)
+
+                audio_tensor = await loop.run_in_executor(None, run_generate)
+
                 # Ensure tensor is on CPU for streaming
                 if hasattr(audio_tensor, 'cpu'):
                     audio_tensor = audio_tensor.cpu()
@@ -504,13 +540,13 @@ async def generate_speech_streaming(
                 # Clamp values to [-1, 1] before conversion
                 audio_tensor = torch.clamp(audio_tensor, -1.0, 1.0)
                 audio_tensor_int = (audio_tensor * 32767).to(torch.int16)
-                
+
                 # Yield the raw audio data as bytes
                 pcm_data = audio_tensor_int.numpy().tobytes()
                 yield pcm_data
-                
+
                 total_samples += audio_tensor.shape[1]
-                
+
                 # Clean up this chunk
                 safe_delete_tensors(audio_tensor, audio_tensor_int)
                 del pcm_data
@@ -684,21 +720,29 @@ async def generate_speech_sse(
             
             print(f"SSE streaming audio for chunk {i+1}/{len(chunks)}: '{chunk[:50]}{'...' if len(chunk) > 50 else ''}'")
             
-            # Use torch.no_grad() to prevent gradient accumulation
-            with torch.no_grad():
-                # Run TTS generation in executor to avoid blocking
-                audio_tensor = await loop.run_in_executor(
-                    None,
-                    lambda: model.generate(
-                        text=chunk,
-                        audio_prompt_path=voice_sample_path,
-                        exaggeration=exaggeration,
-                        cfg_weight=cfg_weight,
-                        temperature=temperature,
-                        **({'language_id': language_id} if is_multilingual() else {})
-                    )
-                )
-                
+            # Use torch.inference_mode() for better performance
+            with torch.inference_mode():
+                # Prepare generation kwargs
+                generate_kwargs = {
+                    "text": chunk,
+                    "audio_prompt_path": voice_sample_path,
+                    "exaggeration": exaggeration,
+                    "cfg_weight": cfg_weight,
+                    "temperature": temperature
+                }
+                if is_multilingual():
+                    generate_kwargs["language_id"] = language_id
+
+                # Run inference with autocast for FP16 mode
+                def run_generate():
+                    if is_fp16():
+                        with torch.autocast(device_type='cuda', dtype=torch.float16):
+                            return model.generate(**generate_kwargs)
+                    else:
+                        return model.generate(**generate_kwargs)
+
+                audio_tensor = await loop.run_in_executor(None, run_generate)
+
                 # Ensure tensor is on CPU for processing
                 if hasattr(audio_tensor, 'cpu'):
                     audio_tensor = audio_tensor.cpu()
@@ -707,19 +751,19 @@ async def generate_speech_sse(
                 audio_tensor = torch.clamp(audio_tensor, -1.0, 1.0)
                 audio_tensor_int = (audio_tensor * 32767).to(torch.int16)
                 pcm_data = audio_tensor_int.numpy().tobytes()
-                
+
                 # Base64 encode the raw PCM data
                 audio_base64 = base64.b64encode(pcm_data).decode('utf-8')
-                
+
                 # Create SSE event for this audio chunk
                 sse_event = SSEAudioDelta(audio=audio_base64)
-                
+
                 # Format as SSE event
                 sse_data = f"data: {sse_event.model_dump_json()}\n\n"
                 yield sse_data
-                
+
                 total_audio_chunks += 1
-                
+
                 # Clean up this chunk
                 safe_delete_tensors(audio_tensor, audio_tensor_int)
                 del pcm_data

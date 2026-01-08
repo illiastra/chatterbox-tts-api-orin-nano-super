@@ -1,0 +1,111 @@
+# Dockerfile.jetson - For NVIDIA Jetson Orin Nano Super
+# Uses L4T (Linux for Tegra) base image with PyTorch pre-installed
+# IMPORTANT: Preserves Jetson-optimized PyTorch with CUDA support
+
+FROM dustynv/l4t-pytorch:r36.4.0
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    wget \
+    curl \
+    ffmpeg \
+    libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Reset pip config to use standard PyPI (dustynv images use custom broken index)
+RUN rm -f /usr/pip.conf /etc/pip.conf ~/.pip/pip.conf ~/.config/pip/pip.conf /root/.config/pip/pip.conf 2>/dev/null || true
+
+# Set working directory
+WORKDIR /app
+
+# Create constraints file to prevent torch from being upgraded
+# This preserves the Jetson-optimized PyTorch with CUDA support
+RUN echo "torch" > /tmp/constraints.txt && \
+    echo "torchvision" >> /tmp/constraints.txt && \
+    echo "torchaudio" >> /tmp/constraints.txt
+
+# Install Python dependencies from standard PyPI
+RUN pip3 install --no-cache-dir --index-url https://pypi.org/simple/ \
+    fastapi \
+    "uvicorn[standard]" \
+    python-dotenv \
+    python-multipart \
+    requests \
+    psutil \
+    pydub \
+    sse-starlette
+
+# Install chatterbox-tts dependencies first (excluding torch)
+RUN pip3 install --no-cache-dir --index-url https://pypi.org/simple/ \
+    -c /tmp/constraints.txt \
+    "numpy<1.26.0,>=1.24.0" \
+    librosa==0.11.0 \
+    transformers==4.46.3 \
+    diffusers==0.29.0 \
+    resemble-perth==1.0.1 \
+    conformer==0.3.2 \
+    safetensors==0.5.3 \
+    pykakasi==2.3.0 \
+    s3tokenizer \
+    einops
+
+# Install chatterbox-tts with --no-deps to avoid overwriting torch
+RUN pip3 install --no-cache-dir --no-deps --index-url https://pypi.org/simple/ \
+    git+https://github.com/travisvn/chatterbox-multilingual.git@exp
+
+# Copy application code
+COPY app/ ./app/
+COPY main.py ./
+
+# Copy voice sample
+COPY voice-sample.mp3 ./voice-sample.mp3
+
+# Create directories
+RUN mkdir -p /cache /voices /data/long_text_jobs
+
+# Set default environment variables
+ENV PORT=4123
+ENV HOST=0.0.0.0
+ENV DEVICE=cuda
+
+# Jetson memory optimization - CRITICAL for 8GB unified memory
+ENV LOW_MEMORY_MODE=true
+ENV USE_FP16=true
+ENV TORCH_CUDNN_BENCHMARK=true
+
+# PyTorch CUDA memory allocator settings for Jetson
+# - expandable_segments: Better memory reuse, reduces fragmentation
+# - max_split_size_mb: Limits allocation splits to prevent fragmentation
+ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,max_split_size_mb:128
+
+# Warmup settings (fewer runs to conserve memory)
+ENV WARMUP_ON_STARTUP=true
+ENV WARMUP_RUNS=2
+
+# Use standard (English-only) model to save memory
+ENV USE_MULTILINGUAL_MODEL=false
+
+# Path settings
+ENV MODEL_CACHE_DIR=/cache
+ENV VOICE_LIBRARY_DIR=/voices
+ENV VOICE_SAMPLE_PATH=/app/voice-sample.mp3
+
+# Long text settings (conservative for Jetson)
+ENV LONG_TEXT_DATA_DIR=/data/long_text_jobs
+ENV LONG_TEXT_MAX_CONCURRENT_JOBS=1
+
+# Expose port
+EXPOSE ${PORT}
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5m --retries=3 \
+    CMD curl -f http://localhost:${PORT}/health || exit 1
+
+# Run the application
+CMD ["python3", "main.py"]

@@ -1,0 +1,85 @@
+services:
+  # Main TTS API Service (Jetson/L4T optimized)
+  chatterbox-tts:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.jetson
+    container_name: chatterbox-tts-orin
+    ports:
+      - '${PORT:-4123}:${PORT:-4123}'
+    environment:
+      # API Configuration
+      - PORT=${PORT:-4123}
+      - HOST=${HOST:-0.0.0.0}
+
+      # Jetson memory optimization - CRITICAL for 8GB unified memory
+      - DEVICE=cuda
+      - LOW_MEMORY_MODE=true
+      - USE_FP16=true
+      - TORCH_CUDNN_BENCHMARK=true
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:32,garbage_collection_threshold:0.5
+
+      # Use standard (English-only) model to save memory
+      - USE_MULTILINGUAL_MODEL=${USE_MULTILINGUAL_MODEL:-false}
+
+      # Warmup settings - 1 run to balance performance vs memory
+      - WARMUP_ON_STARTUP=true
+      - WARMUP_RUNS=1
+
+      # TTS Model Settings
+      - EXAGGERATION=${EXAGGERATION:-0.5}
+      - CFG_WEIGHT=${CFG_WEIGHT:-0.5}
+      - TEMPERATURE=${TEMPERATURE:-0.8}
+
+      # Text Processing
+      - MAX_CHUNK_LENGTH=${MAX_CHUNK_LENGTH:-280}
+      - MAX_TOTAL_LENGTH=${MAX_TOTAL_LENGTH:-3000}
+
+      # Voice and Model Settings
+      - VOICE_SAMPLE_PATH=/app/voice-sample.mp3
+      - MODEL_CACHE_DIR=/cache
+      - VOICE_LIBRARY_DIR=/voices
+
+      # Long Text TTS Settings (conservative for Jetson)
+      - LONG_TEXT_DATA_DIR=/data/long_text_jobs
+      - LONG_TEXT_MAX_LENGTH=${LONG_TEXT_MAX_LENGTH:-100000}
+      - LONG_TEXT_CHUNK_SIZE=${LONG_TEXT_CHUNK_SIZE:-2500}
+      - LONG_TEXT_SILENCE_PADDING_MS=${LONG_TEXT_SILENCE_PADDING_MS:-200}
+      - LONG_TEXT_JOB_RETENTION_DAYS=${LONG_TEXT_JOB_RETENTION_DAYS:-7}
+      - LONG_TEXT_MAX_CONCURRENT_JOBS=${LONG_TEXT_MAX_CONCURRENT_JOBS:-1}
+    volumes:
+      - ${VOICE_SAMPLE_HOST_PATH:-../voice-sample.mp3}:/app/voice-sample.mp3:ro
+      - chatterbox-models:/cache
+      - chatterbox-voices:/voices
+      - chatterbox-longtext-data:/data/long_text_jobs
+      # Mount app source for development (remove in production)
+      - ../app:/app/app:ro
+    runtime: nvidia
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:${PORT:-4123}/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 300s
+
+  # Frontend Service with integrated proxy (optional - requires 'frontend' profile)
+  frontend:
+    profiles: ['frontend', 'ui', 'fullstack']
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: chatterbox-tts-frontend-jetson
+    ports:
+      - '${FRONTEND_PORT:-4321}:80'
+    depends_on:
+      - chatterbox-tts
+    restart: unless-stopped
+
+volumes:
+  chatterbox-models:
+    driver: local
+  chatterbox-voices:
+    driver: local
+  chatterbox-longtext-data:
+    driver: local
