@@ -2,50 +2,8 @@
   <img src="https://lm17s1uz51.ufs.sh/f/EsgO8cDHBTOU5bjcd6giJaPhnlpTZysr24u6k9WGqwIjNgQo" alt="Chatterbox API TTS header">
 </p>
 
-# Chatterbox TTS API
-
-<p align="center">
-	<a href="https://github.com/travisvn/chatterbox-tts-api">
-		<img src="https://img.shields.io/github/stars/travisvn/chatterbox-tts-api?style=social" alt="GitHub stars"></a>
-	<a href="https://github.com/travisvn/chatterbox-tts-api">
-		<img alt="GitHub forks" src="https://img.shields.io/github/forks/travisvn/chatterbox-tts-api"></a>
-	<a href="https://github.com/travisvn/chatterbox-tts-api/issues">
-	  <img src="https://img.shields.io/github/issues/travisvn/chatterbox-tts-api" alt="GitHub issues"></a>
-	<img src="https://img.shields.io/github/last-commit/travisvn/chatterbox-tts-api?color=red" alt="GitHub last commit">
-  <a href="http://chatterboxtts.com/discord">
-    <img src="https://img.shields.io/badge/Discord-Voice_AI_%26_TTS_Tools-blue?logo=discord&logoColor=white" alt="Discord">
-  </a>
-</p>
-
-**FastAPI**-powered REST API for [Chatterbox TTS](https://github.com/resemble-ai/chatterbox), providing OpenAI-compatible text-to-speech endpoints with voice cloning capabilities and additional features on top of the `chatterbox-tts` base package.
-
-## Features
-
-🚀 **OpenAI-Compatible API** - Drop-in replacement for OpenAI's TTS API  
-⚡ **FastAPI Performance** - High-performance async API with automatic documentation  
-🌍 **Multilingual Support** - Generate speech in 22 languages with language-aware voice cloning  
-🎨 **React Frontend** - Includes an optional, ready-to-use web interface  
-🎭 **Voice Cloning** - Use your own voice samples for personalized speech  
-🎤 **Voice Library Management** - Upload, manage, and use custom voices by name  
-📝 **Smart Text Processing** - Automatic chunking for long texts  
-📊 **Real-time Status** - Monitor TTS progress, statistics, and request history  
-🐳 **Docker Ready** - Full containerization with persistent voice storage  
-⚙️ **Configurable** - Extensive environment variable configuration  
-🎛️ **Parameter Control** - Real-time adjustment of speech characteristics  
-📚 **Auto Documentation** - Interactive API docs at `/docs` and `/redoc`  
-🔧 **Type Safety** - Full Pydantic validation for requests and responses  
-🧠 **Memory Management** - Advanced memory monitoring and automatic cleanup
-
-> [!NOTE]
-> _Support for Chatterbox Turbo coming soon_
-
-
-> [!IMPORTANT]
-> `resemble-ai/chatterbox` is currently broken for non-CUDA setups (see [chatterbox issues](https://github.com/resemble-ai/chatterbox/issues))
-> 
-> Revert to non-multilingual by using the `stable` branch of this repo
->
-> [View more instructions](#issues-with-multilingual)
+# Chatterbox TTS API 
+# (A fork that supports Jetson Orin Nano Super)
 
 ## ⚡️ Quick Start
 
