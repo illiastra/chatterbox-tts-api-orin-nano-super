@@ -65,8 +65,8 @@ uv run main.py
 
 ```bash
 # Clone the repository
-git clone https://github.com/travisvn/chatterbox-tts-api
-cd chatterbox-tts-api
+git clone https://github.com/illiastra/chatterbox-tts-api-orin-nano-super
+cd chatterbox-tts-api-orin-nano-super
 
 # Install uv if you haven't already
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -89,8 +89,8 @@ uv run main.py
 
 ```bash
 # Clone the repository
-git clone https://github.com/travisvn/chatterbox-tts-api
-cd chatterbox-tts-api
+git clone https://github.com/illiastra/chatterbox-tts-api-orin-nano-super
+cd chatterbox-tts-api-orin-nano-super
 
 # Setup environment — using Python 3.11
 python -m venv .venv
@@ -111,14 +111,14 @@ uvicorn app.main:app --host 0.0.0.0 --port 4123
 python main.py
 ```
 
-> Ran into issues? Check the [troubleshooting section](https://github.com/travisvn/chatterbox-tts-api?tab=readme-ov-file#common-issues)
+> Ran into issues? Check the [troubleshooting section](https://github.com/illiastra/chatterbox-tts-api-orin-nano-super?tab=readme-ov-file#common-issues)
 
 ### 🐳 Docker (Recommended)
 
 ```bash
 # Clone and start with Docker Compose
-git clone https://github.com/travisvn/chatterbox-tts-api
-cd chatterbox-tts-api
+git clone https://github.com/travisvn/chatterbox-tts-api-orin-nano-super
+cd chatterbox-tts-api-orin-nano-super
 
 # Use Docker-optimized environment variables
 cp .env.example.docker .env  # Docker-specific paths, ready to use
@@ -127,21 +127,13 @@ cp .env.example.docker .env  # Docker-specific paths, ready to use
 # Choose your deployment method:
 
 # API Only (default)
-docker compose -f docker/docker-compose.yml up -d             # Standard (pip-based)
-docker compose -f docker/docker-compose.uv.yml up -d          # uv-optimized (faster builds)
-docker compose -f docker/docker-compose.gpu.yml up -d         # Standard + GPU
-docker compose -f docker/docker-compose.uv.gpu.yml up -d      # uv + GPU (recommended for GPU users)
-docker compose -f docker/docker-compose.cpu.yml up -d         # CPU-only
-docker compose -f docker/docker-compose.blackwell.yml up -d   # Blackwell (50XX) NVIDIA GPUs
+docker compose -f docker/docker-compose.jetson.yml up -d      # Very low memory Jetson Orin Nano Super
 
 # API + Frontend (add --profile frontend to any of the above)
-docker compose -f docker/docker-compose.yml --profile frontend up -d             # Standard + Frontend
-docker compose -f docker/docker-compose.gpu.yml --profile frontend up -d         # GPU + Frontend
-docker compose -f docker/docker-compose.uv.gpu.yml --profile frontend up -d      # uv + GPU + Frontend
-docker compose -f docker/docker-compose.blackwell.yml --profile frontend up -d   # (Blackwell) uv + GPU + Frontend
+docker compose -f docker/docker-compose.jetson.yml --profile frontend up -d   # Very low memory Jetson Orin Nano Super
 
 # Watch the logs as it initializes (the first use of TTS takes the longest)
-docker logs chatterbox-tts-api -f
+docker logs chatterbox-tts-orin -f
 
 # Test the API
 curl -X POST http://localhost:4123/v1/audio/speech \
