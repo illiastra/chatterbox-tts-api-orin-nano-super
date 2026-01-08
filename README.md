@@ -1,86 +1,11 @@
-<p align="center">
-  <img src="https://lm17s1uz51.ufs.sh/f/EsgO8cDHBTOU5bjcd6giJaPhnlpTZysr24u6k9WGqwIjNgQo" alt="Chatterbox API TTS header">
-</p>
+# Chatterbox TTS API (for Jetson Orin Nano Super)
 
-# Chatterbox TTS API 
-# (A fork that supports Jetson Orin Nano Super)
-
-## ⚡️ Quick Start
-
-```bash
-git clone https://github.com/illiastra/chatterbox-tts-api-orin-nano-super
-cd chatterbox-tts-api-orin-nano-super
-uv sync
-uv run main.py
-```
-
-> [!TIP]  
-> [uv](https://docs.astral.sh/uv/) installed with `curl -LsSf https://astral.sh/uv/install.sh | sh`
-
-### Local Installation with Python 🐍
-
-#### Option A: Using uv (Recommended - Faster & Better Dependencies)
-
-```bash
-# Clone the repository
-git clone https://github.com/illiastra/chatterbox-tts-api-orin-nano-super
-cd chatterbox-tts-api-orin-nano-super
-
-# Install uv if you haven't already
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Install dependencies with uv (automatically creates venv)
-uv sync
-
-# Copy and customize environment variables
-cp .env.example .env
-
-# Start the API with FastAPI
-uv run uvicorn app.main:app --host 0.0.0.0 --port 4123
-# Or use the main script
-uv run main.py
-```
-
-> 💡 **Why uv?** Users report better compatibility with `chatterbox-tts`, 25-40% faster installs, and superior dependency resolution. [See migration guide →](docs/UV_MIGRATION.md)
-
-#### Option B: Using pip (Traditional)
-
-```bash
-# Clone the repository
-git clone https://github.com/illiastra/chatterbox-tts-api-orin-nano-super
-cd chatterbox-tts-api-orin-nano-super
-
-# Setup environment — using Python 3.11
-python -m venv .venv
-source .venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Copy and customize environment variables
-cp .env.example .env
-
-# Add your voice sample (or use the provided one)
-# cp your-voice.mp3 voice-sample.mp3
-
-# Start the API with FastAPI
-uvicorn app.main:app --host 0.0.0.0 --port 4123
-# Or use the main script
-python main.py
-```
-
-> Ran into issues? Check the [troubleshooting section](https://github.com/illiastra/chatterbox-tts-api-orin-nano-super?tab=readme-ov-file#common-issues)
-
-### 🐳 Docker (Recommended)
+### 🐳 Docker
 
 ```bash
 # Clone and start with Docker Compose
 git clone https://github.com/travisvn/chatterbox-tts-api-orin-nano-super
 cd chatterbox-tts-api-orin-nano-super
-
-# Use Docker-optimized environment variables
-cp .env.example.docker .env  # Docker-specific paths, ready to use
-# Or: cp .env.example .env    # Local development paths, needs customization
 
 # Choose your deployment method:
 
